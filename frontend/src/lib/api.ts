@@ -1,6 +1,7 @@
 // Thin client for the FinSearch Python API. All data comes from the backend.
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+// Empty means "same site": Next.js forwards /api/* to the backend (see next.config.ts).
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export type WatchlistItem = { symbol: string; name: string; added_at: string };
 
