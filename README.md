@@ -18,19 +18,40 @@ A personal research app for Indian stocks (NSE/BSE).
 
 All market data calls live in `backend/app/data.py`, so data sources can be changed without touching the UI. No API keys are needed.
 
+## Run it in your browser (no installs): GitHub Codespaces
+
+Good for a work laptop where you can't install software. Free for personal GitHub accounts (60 hours a month).
+
+1. On the repo page click **Code → Codespaces → Create codespace on main**. Setup takes a few minutes the first time.
+2. In the Codespace terminal, start the backend:
+   ```bash
+   cd backend && uvicorn app.main:app --reload
+   ```
+3. Open a second terminal (the **+** button) and start the frontend:
+   ```bash
+   cd frontend && npm run dev
+   ```
+4. A pop-up offers to open port 3000 in the browser. If you miss it, open the **Ports** tab and click the globe icon next to port 3000.
+
 ## Run it locally
 
 You need Python 3.11+ and Node.js 20+.
 
 **1. Backend** (http://localhost:8000, API docs at http://localhost:8000/docs)
 
-```bash
+Windows (PowerShell):
+
+```powershell
 cd backend
 python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+.venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
+
+If PowerShell refuses to run `activate`, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once, or use Command Prompt (`cmd`), where the same commands work.
+
+macOS / Linux: the same, but activate with `source .venv/bin/activate`.
 
 **2. Frontend** (http://localhost:3000), in a second terminal
 
@@ -40,7 +61,7 @@ npm install
 npm run dev
 ```
 
-If the backend runs somewhere else, set `NEXT_PUBLIC_API_URL` (e.g. in `frontend/.env.local`).
+Then open http://localhost:3000. The frontend forwards `/api/*` to the backend at `http://localhost:8000`; set `BACKEND_URL` if the backend runs elsewhere.
 
 ## Tests
 
