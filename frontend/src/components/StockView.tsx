@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, type Metrics, type NextResults, type Overview } from "@/lib/api";
 import { crore, daysUntil, longDate, money, num, pct, signedPct } from "@/lib/format";
+import FinancialStatements from "./FinancialStatements";
 import PriceChart from "./PriceChart";
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
@@ -132,6 +133,7 @@ export default function StockView({ symbol }: { symbol: string }) {
           <Stat label="Sales (TTM)" value={crore(metrics.revenue, cur)} />
           <Stat label="Profit margin" value={pct(metrics.profit_margin)} />
           <Stat label="ROE" value={pct(metrics.roe)} />
+          <Stat label="ROCE" value={pct(metrics.roce)} />
           <Stat label="Price / book" value={num(metrics.price_to_book)} />
           <Stat label="52-week high" value={money(metrics.week52_high, cur)} />
           <Stat label="52-week low" value={money(metrics.week52_low, cur)} />
@@ -139,6 +141,8 @@ export default function StockView({ symbol }: { symbol: string }) {
           <Stat label="Beta" value={num(metrics.beta)} />
         </div>
       </Card>
+
+      <FinancialStatements symbol={symbol} />
 
       <p className="text-xs text-neutral-500">
         Data from Yahoo Finance and NSE India (unofficial sources, may be delayed). Not investment advice.

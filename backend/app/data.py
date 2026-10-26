@@ -104,11 +104,119 @@ def get_metrics(symbol: str) -> dict:
         "profit_margin": info.get("profitMargins"),
         "price_to_book": info.get("priceToBook"),
         "roe": info.get("returnOnEquity"),
+        "roce": _roce(symbol),
         "week52_high": info.get("fiftyTwoWeekHigh"),
         "week52_low": info.get("fiftyTwoWeekLow"),
         "dividend_yield": dividend_rate / price if dividend_rate and price else None,
         "beta": info.get("beta"),
     }
+
+
+# Rows shown in each statement: (label on screen, Yahoo row names to try in order).
+STATEMENTS = {
+    "pnl": [
+        ("Sales", ["Total Revenue", "Operating Revenue"]),
+        ("Expenses", ["Total Expenses"]),
+        ("Operating profit (EBITDA)", ["EBITDA", "Normalized EBITDA"]),
+        ("Depreciation", ["Reconciled Depreciation", "Depreciation And Amortization In Income Statement"]),
+        ("EBIT", ["EBIT", "Operating Income"]),
+        ("Interest", ["Interest Expense", "Interest Expense Non Operating"]),
+        ("Profit before tax", ["Pretax Income"]),
+        ("Tax", ["Tax Provision"]),
+        ("Net profit", ["Net Income", "Net Income Common Stockholders"]),
+        ("EPS", ["Diluted EPS", "Basic EPS"]),
+    ],
+    "balance_sheet": [
+        ("Share capital + reserves (equity)", ["Stockholders Equity", "Common Stock Equity"]),
+        ("Total debt", ["Total Debt"]),
+        ("Current liabilities", ["Current Liabilities"]),
+        ("Total liabilities", ["Total Liabilities Net Minority Interest"]),
+        ("Fixed assets (net)", ["Net PPE"]),
+        ("Investments", ["Investments And Advances", "Long Term Equity Investment"]),
+        ("Cash and equivalents", ["Cash And Cash Equivalents", "Cash Cash Equivalents And Short Term Investments"]),
+        ("Current assets", ["Current Assets"]),
+        ("Total assets", ["Total Assets"]),
+    ],
+    "cash_flow": [
+        ("Cash from operations", ["Operating Cash Flow"]),
+        ("Cash from investing", ["Investing Cash Flow"]),
+        ("Cash from financing", ["Financing Cash Flow"]),
+        ("Net cash flow", ["Changes In Cash"]),
+        ("Capital expenditure", ["Capital Expenditure"]),
+        ("Free cash flow", ["Free Cash Flow"]),
+        ("Dividends paid", ["Cash Dividends Paid", "Common Stock Dividend Paid"]),
+    ],
+}
+
+FREQUENCIES = ("annual", "quarterly")
+PER_SHARE = {"EPS"}  # shown in rupees, not crore
+
+
+@ttl_cache(seconds=24 * 3600)
+def _statement_frames(symbol: str, freq: str) -> dict:
+    t = yf.Ticker(symbol)
+    if freq == "annual":
+        return {"pnl": t.income_stmt, "balance_sheet": t.balance_sheet, "cash_flow": t.cashflow}
+    return {"pnl": t.quarterly_income_stmt, "balance_sheet": t.quarterly_balance_sheet,
+            "cash_flow": t.quarterly_cashflow}
+
+
+def _pick(df, names: list[str]):
+    """The first Yahoo row that exists, as a Series by period; None if none do."""
+    for name in names:
+        if df is not None and not df.empty and name in df.index:
+            return df.loc[name]
+    return None
+
+
+def _number(value) -> float | None:
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if v != v else v  # NaN -> None
+
+
+def get_financials(symbol: str, freq: str) -> dict:
+    """P&L, balance sheet and cash flow, oldest period first, values in the stock's currency."""
+    if freq not in FREQUENCIES:
+        raise ValueError(f"freq must be one of {', '.join(FREQUENCIES)}")
+    frames = _statement_frames(symbol, freq)
+    result = {}
+    for key, rows in STATEMENTS.items():
+        df = frames.get(key)
+        if df is None or df.empty:
+            result[key] = {"periods": [], "rows": []}
+            continue
+        periods = sorted(df.columns)[-(10 if freq == "annual" else 8):]
+        out_rows = []
+        for label, names in rows:
+            series = _pick(df, names)
+            if series is None:
+                continue
+            values = [_number(series.get(p)) for p in periods]
+            if any(v is not None for v in values):
+                out_rows.append({"label": label, "values": values, "per_share": label in PER_SHARE})
+        result[key] = {"periods": [p.strftime("%Y-%m-%d") for p in periods], "rows": out_rows}
+    return result
+
+
+def _roce(symbol: str) -> float | None:
+    """Return on capital employed = EBIT / (total assets - current liabilities), latest financial year."""
+    try:
+        frames = _statement_frames(symbol, "annual")
+        pnl, bs = frames["pnl"], frames["balance_sheet"]
+        ebit, assets, cur_liab = (_pick(pnl, ["EBIT", "Operating Income"]), _pick(bs, ["Total Assets"]),
+                                  _pick(bs, ["Current Liabilities"]))
+        if ebit is None or assets is None or cur_liab is None:
+            return None
+        year = max(set(pnl.columns) & set(bs.columns))
+        e, a, c = _number(ebit.get(year)), _number(assets.get(year)), _number(cur_liab.get(year))
+    except Exception:  # ROCE is a nice-to-have; never fail the metrics card over it
+        return None
+    if e is None or a is None or c is None or a - c <= 0:
+        return None
+    return e / (a - c)
 
 
 # period -> bar interval; long periods use weekly bars to keep the chart light.

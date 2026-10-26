@@ -31,6 +31,7 @@ export type Metrics = {
   profit_margin: number | null;
   price_to_book: number | null;
   roe: number | null;
+  roce: number | null;
   week52_high: number | null;
   week52_low: number | null;
   dividend_yield: number | null;
@@ -40,6 +41,11 @@ export type Metrics = {
 export type PricePoint = { date: string; close: number };
 
 export type NextResults = { date: string | null; purpose: string | null; source: string | null };
+
+export type StatementRow = { label: string; values: (number | null)[]; per_share: boolean };
+export type Statement = { periods: string[]; rows: StatementRow[] };
+export type Financials = { pnl: Statement; balance_sheet: Statement; cash_flow: Statement };
+export type Frequency = "annual" | "quarterly";
 
 export const PERIODS = ["1mo", "6mo", "1y", "5y", "max"] as const;
 export type Period = (typeof PERIODS)[number];
@@ -70,5 +76,7 @@ export const api = {
   metrics: (symbol: string) => request<Metrics>(`/api/stocks/${enc(symbol)}/metrics`),
   history: (symbol: string, period: Period) =>
     request<PricePoint[]>(`/api/stocks/${enc(symbol)}/history?period=${period}`),
+  financials: (symbol: string, freq: Frequency) =>
+    request<Financials>(`/api/stocks/${enc(symbol)}/financials?freq=${freq}`),
   nextResults: (symbol: string) => request<NextResults>(`/api/stocks/${enc(symbol)}/next-results`),
 };
