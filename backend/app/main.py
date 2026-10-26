@@ -87,6 +87,11 @@ def history(symbol: str, period: str = "1y"):
     return fetch(data.get_history, resolve(symbol), period)
 
 
+@app.get("/api/stocks/{symbol}/financials")
+def financials(symbol: str, freq: str = "annual"):
+    return fetch(data.get_financials, resolve(symbol), freq)
+
+
 @app.get("/api/stocks/{symbol}/next-results")
 def next_results(symbol: str):
     return fetch(data.get_next_results, resolve(symbol))

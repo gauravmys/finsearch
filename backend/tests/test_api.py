@@ -33,6 +33,7 @@ def client(tmp_path, monkeypatch):
         return FAKE_INFO[symbol]
 
     monkeypatch.setattr(data, "_info", fake_info)
+    monkeypatch.setattr(data, "_statement_frames", lambda symbol, freq: {})
     with TestClient(app) as c:
         yield c
 
@@ -119,3 +120,47 @@ def test_next_results_falls_back_to_yahoo(monkeypatch):
     )
     data.get_next_results.cache_clear()
     assert data.get_next_results("TCS.NS")["source"] == "Yahoo"
+
+
+def fake_frames(symbol, freq):
+    import pandas as pd
+
+    years = [pd.Timestamp("2025-03-31"), pd.Timestamp("2024-03-31")]  # Yahoo lists newest first
+    pnl = pd.DataFrame(
+        {years[0]: [1000.0, 200.0, 50.0], years[1]: [900.0, 180.0, float("nan")]},
+        index=["Total Revenue", "EBIT", "Diluted EPS"],
+    )
+    bs = pd.DataFrame(
+        {years[0]: [2000.0, 400.0], years[1]: [1800.0, 300.0]},
+        index=["Total Assets", "Current Liabilities"],
+    )
+    return {"pnl": pnl, "balance_sheet": bs, "cash_flow": pd.DataFrame()}
+
+
+def test_financials_oldest_first_and_skips_missing_rows(client, monkeypatch):
+    monkeypatch.setattr(data, "_statement_frames", fake_frames)
+    f = client.get("/api/stocks/RELIANCE/financials").json()
+    assert f["pnl"]["periods"] == ["2024-03-31", "2025-03-31"]
+    rows = {r["label"]: r for r in f["pnl"]["rows"]}
+    assert rows["Sales"]["values"] == [900.0, 1000.0]
+    assert rows["EPS"]["values"] == [None, 50.0] and rows["EPS"]["per_share"] is True
+    assert "Net profit" not in rows  # Yahoo didn't send it
+    assert f["cash_flow"] == {"periods": [], "rows": []}
+
+
+def test_financials_rejects_bad_freq(client):
+    assert client.get("/api/stocks/RELIANCE/financials?freq=weekly").status_code == 400
+
+
+def test_roce_uses_latest_year(client, monkeypatch):
+    monkeypatch.setattr(data, "_statement_frames", fake_frames)
+    m = client.get("/api/stocks/RELIANCE/metrics").json()
+    assert m["roce"] == pytest.approx(200 / (2000 - 400))
+
+
+def test_roce_missing_data_is_none(client, monkeypatch):
+    def boom(symbol, freq):
+        raise RuntimeError("yahoo down")
+
+    monkeypatch.setattr(data, "_statement_frames", boom)
+    assert client.get("/api/stocks/RELIANCE/metrics").json()["roce"] is None

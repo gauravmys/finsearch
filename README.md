@@ -5,8 +5,9 @@ A personal research app for Indian stocks (NSE/BSE).
 **Phase 1 (this version)**
 - Watchlist: add a stock by NSE symbol (`TCS`) or BSE code (`500325`), remove it with ×
 - Company overview: sector, industry, employees, website, business summary
-- Key metrics: price and day change, market cap, P/E, EPS, sales, profit margin, ROE, P/B, 52-week range, dividend yield, beta
+- Key metrics: price and day change, market cap, P/E, EPS, sales, profit margin, ROE, ROCE, P/B, 52-week range, dividend yield, beta
 - Price chart with 1M / 6M / 1Y / 5Y / Max ranges
+- Financial statements: Profit & Loss, Balance Sheet and Cash Flows, annual or quarterly, in ₹ crore
 - Next financial results date (NSE board meeting announcements, Yahoo as fallback)
 
 ## Stack
@@ -81,6 +82,7 @@ The tests stub out the data sources, so they run offline.
 | GET | `/api/stocks/{symbol}/overview` | Company profile |
 | GET | `/api/stocks/{symbol}/metrics` | Key metrics |
 | GET | `/api/stocks/{symbol}/history?period=1y` | Closing prices (`1mo`, `6mo`, `1y`, `5y`, `max`) |
+| GET | `/api/stocks/{symbol}/financials?freq=annual` | Profit & loss, balance sheet, cash flow (`annual` or `quarterly`) |
 | GET | `/api/stocks/{symbol}/next-results` | Next results date and its source |
 
 ## Data caveats
